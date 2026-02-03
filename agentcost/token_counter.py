@@ -1,0 +1,259 @@
+"""
+AgentCost Token Counter
+
+Handles token counting for different LLM providers using tiktoken.
+"""
+
+import logging
+import tiktoken
+from typing import Dict, List, Any, Optional, Tuple
+
+# Logger for token counter warnings
+logger = logging.getLogger("agentcost.token_counter")
+
+
+class TokenCounter:
+    """Handles token counting for different LLM providers"""
+    
+    # Track if we've warned about estimation for this model
+    _estimation_warnings_shown: set = set()
+    
+    MODEL_ENCODINGS: Dict[str, str] = {
+        # OpenAI models
+        'gpt-4': 'cl100k_base',
+        'gpt-4-turbo': 'cl100k_base',
+        'gpt-4-turbo-preview': 'cl100k_base',
+        'gpt-4o': 'cl100k_base',
+        'gpt-4o-mini': 'cl100k_base',
+        'gpt-3.5-turbo': 'cl100k_base',
+        'gpt-3.5-turbo-16k': 'cl100k_base',
+        'text-davinci-003': 'p50k_base',
+        
+    }
+    
+    _encoding_cache: Dict[str, Any] = {}
+    
+    @classmethod
+    def count_tokens(cls, text: str, model: str) -> int:
+        """
+        Count tokens in text for given model
+        
+        Args:
+            text: Input text to count
+            model: Model name (e.g., 'gpt-4', 'llama-3.1-8b-instant')
+        
+        Returns:
+            Number of tokens
+        """
+        if not text:
+            return 0
+        
+        encoding = cls._get_encoding(model)
+        
+        try:
+            tokens = encoding.encode(text)
+            return len(tokens)
+        except Exception as e:
+            # Log warning about estimation fallback (once per model)
+            if model not in cls._estimation_warnings_shown:
+                logger.warning(
+                    f"Token counting for '{model}' failed, using character-based estimation. "
+                    f"Counts may be inaccurate. Error: {e}"
+                )
+                cls._estimation_warnings_shown.add(model)
+            return cls._estimate_tokens(text)
+    
+    @classmethod
+    def count_tokens_with_accuracy(
+        cls, text: str, model: str
+    ) -> Tuple[int, bool]:
+        """
+        Count tokens with accuracy indicator.
+        
+        Args:
+            text: Input text to count
+            model: Model name
+        
+        Returns:
+            Tuple of (token_count, is_exact)
+            is_exact is False when using character-based estimation
+        """
+        if not text:
+            return (0, True)
+        
+        encoding = cls._get_encoding(model)
+        
+        try:
+            tokens = encoding.encode(text)
+            return (len(tokens), True)
+        except Exception:
+            return (cls._estimate_tokens(text), False)
+    
+    @classmethod
+    def _get_encoding(cls, model: str):
+        """Get or create encoding for model (with caching)"""
+        
+        cache_key = cls._get_encoding_name(model)
+        if cache_key in cls._encoding_cache:
+            return cls._encoding_cache[cache_key]
+        
+        try:
+            encoding = tiktoken.get_encoding(cache_key)
+            cls._encoding_cache[cache_key] = encoding
+            return encoding
+        except Exception:
+            if 'cl100k_base' not in cls._encoding_cache:
+                cls._encoding_cache['cl100k_base'] = tiktoken.get_encoding('cl100k_base')
+            return cls._encoding_cache['cl100k_base']
+    
+    @classmethod
+    def _get_encoding_name(cls, model: str) -> str:
+        """Determine which encoding to use for a model"""
+        if model in cls.MODEL_ENCODINGS:
+            return cls.MODEL_ENCODINGS[model]
+        
+        model_lower = model.lower()
+        if 'gpt-4' in model_lower:
+            return 'cl100k_base'
+        if 'gpt-3.5' in model_lower:
+            return 'cl100k_base'
+        if 'claude' in model_lower:
+            return 'cl100k_base'
+        if 'llama' in model_lower:
+            return 'cl100k_base'
+        if 'mixtral' in model_lower:
+            return 'cl100k_base'
+        
+        return 'cl100k_base'
+    
+    @classmethod
+    def _estimate_tokens(cls, text: str) -> int:
+        """
+        Rough estimation when tokenizer fails.
+        
+        Uses different ratios for different character sets:
+        - English/Latin: 1 token ≈ 4 characters
+        - CJK/Unicode: 1 token ≈ 1.5 characters (these tokenize less efficiently)
+        """
+        if not text:
+            return 0
+        
+        # Check for high proportion of non-ASCII characters (CJK, etc)
+        non_ascii_count = sum(1 for c in text if ord(c) > 127)
+        non_ascii_ratio = non_ascii_count / len(text) if text else 0
+        
+        if non_ascii_ratio > 0.3:
+            # Multilingual text - use more conservative ratio
+            return max(1, int(len(text) / 2))
+        else:
+            # Primarily English - standard ratio
+            return max(1, len(text) // 4)
+    
+    @classmethod
+    def count_message_tokens(cls, messages: List[Dict[str, str]], model: str) -> int:
+        """
+        Count tokens for chat completion messages.
+        Accounts for special tokens added by the API.
+        
+        Example messages format:
+        [
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": "Hello!"},
+            {"role": "assistant", "content": "Hi there!"}
+        ]
+        
+        Args:
+            messages: List of message dictionaries
+            model: Model name
+        
+        Returns:
+            Total token count including overhead
+        """
+        model_lower = model.lower()
+        
+        if 'gpt-4' in model_lower:
+            tokens_per_message = 3
+            tokens_per_name = 1
+        elif 'gpt-3.5' in model_lower:
+            tokens_per_message = 4
+            tokens_per_name = -1
+        else:
+            tokens_per_message = 3
+            tokens_per_name = 1
+        
+        total_tokens = 0
+        
+        for message in messages:
+            total_tokens += tokens_per_message
+            
+            for key, value in message.items():
+                if value:
+                    total_tokens += cls.count_tokens(str(value), model)
+                
+                if key == "name":
+                    total_tokens += tokens_per_name
+        
+        total_tokens += 3
+        
+        return total_tokens
+    
+    @classmethod
+    def extract_text_from_input(cls, input_data: Any) -> str:
+        """
+        Extract text content from various input formats.
+        Handles LangChain message types, strings, lists, etc.
+        
+        Args:
+            input_data: Input in various formats
+        
+        Returns:
+            Extracted text as string
+        """
+        if isinstance(input_data, str):
+            return input_data
+        
+        if isinstance(input_data, list):
+            texts = []
+            for item in input_data:
+                if hasattr(item, 'content'):
+                    texts.append(str(item.content))
+                elif isinstance(item, dict) and 'content' in item:
+                    texts.append(str(item['content']))
+                else:
+                    texts.append(str(item))
+            return " ".join(texts)
+        
+        if hasattr(input_data, 'content'):
+            return str(input_data.content)
+        
+        if hasattr(input_data, 'text'):
+            return str(input_data.text)
+        
+        return str(input_data)
+    
+    @classmethod
+    def extract_text_from_output(cls, output_data: Any) -> str:
+        """
+        Extract text content from LLM response.
+        
+        Args:
+            output_data: LLM response in various formats
+        
+        Returns:
+            Extracted text as string
+        """
+        if isinstance(output_data, str):
+            return output_data
+        
+        if hasattr(output_data, 'content'):
+            return str(output_data.content)
+        
+        if hasattr(output_data, 'text'):
+            return str(output_data.text)
+        
+        if isinstance(output_data, dict):
+            for key in ['content', 'text', 'output', 'response']:
+                if key in output_data:
+                    return str(output_data[key])
+        
+        return str(output_data)
