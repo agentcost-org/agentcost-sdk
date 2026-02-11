@@ -4,6 +4,7 @@
 
 import atexit
 import os
+import contextvars
 from typing import Dict, Any, Optional, List
 from contextlib import contextmanager
 
@@ -22,6 +23,12 @@ def _get_api_url(base_url: Optional[str] = None) -> str:
     if base_url:
         return base_url
     return os.environ.get("AGENTCOST_API_URL", DEFAULT_API_URL)
+
+
+# Thread/async-safe context variable for agent name override
+_agent_name_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    '_agent_name_var', default=None
+)
 
 
 class AgentCostTracker:
@@ -235,17 +242,18 @@ class AgentCostTracker:
         Usage:
             with tracker.agent("router"):
                 llm.invoke("Route this query")  # Tagged with agent="router"
+        
+        Thread-safe: uses contextvars so concurrent blocks don't interfere.
         """
         if not self._config:
             yield
             return
         
-        old_name = self._config.default_agent_name
-        self._config.default_agent_name = name
+        token = _agent_name_var.set(name)
         try:
             yield
         finally:
-            self._config.default_agent_name = old_name
+            _agent_name_var.reset(token)
     
     @contextmanager
     def metadata(self, **kwargs):

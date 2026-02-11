@@ -20,6 +20,20 @@ from .cost_calculator import calculate_cost
 from .config import get_config
 
 
+def _get_effective_agent_name(config, explicit: Optional[str] = None) -> str:
+    """Get the effective agent name, respecting context variable override."""
+    if explicit:
+        return explicit
+    # Import here to avoid circular imports
+    from .tracker import _agent_name_var
+    ctx_name = _agent_name_var.get(None)
+    if ctx_name:
+        return ctx_name
+    if config:
+        return config.default_agent_name
+    return "default"
+
+
 def _hash_input(input_text: str) -> str:
     """
     Hash input text for caching pattern detection.
@@ -140,12 +154,8 @@ class LangChainInterceptor:
             
             model_name = _get_model_name(llm_self)
             
-            agent_name = kwargs.pop('_agentcost_agent', None)
-            if not agent_name and config:
-                agent_name = config.default_agent_name
-            agent_name = agent_name or 'default'
-            
-            start_time = time.time()
+            explicit_agent = kwargs.pop('_agentcost_agent', None)
+            agent_name = _get_effective_agent_name(config, explicit_agent)
             
             input_text = TokenCounter.extract_text_from_input(input_data)
             input_tokens = TokenCounter.count_tokens(input_text, model_name)
@@ -295,10 +305,8 @@ class LangChainInterceptor:
                 return
             
             model_name = _get_model_name(llm_self)
-            agent_name = kwargs.pop('_agentcost_agent', None)
-            if not agent_name and config:
-                agent_name = config.default_agent_name
-            agent_name = agent_name or 'default'
+            explicit_agent = kwargs.pop('_agentcost_agent', None)
+            agent_name = _get_effective_agent_name(config, explicit_agent)
             
             start_time = time.time()
             
@@ -374,10 +382,8 @@ class LangChainInterceptor:
             
             # Extract model and agent info
             model_name = _get_model_name(llm_self)
-            agent_name = kwargs.pop('_agentcost_agent', None)
-            if not agent_name and config:
-                agent_name = config.default_agent_name
-            agent_name = agent_name or 'default'
+            explicit_agent = kwargs.pop('_agentcost_agent', None)
+            agent_name = _get_effective_agent_name(config, explicit_agent)
             
             # Start timing
             start_time = time.time()
