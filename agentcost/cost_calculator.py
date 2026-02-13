@@ -63,11 +63,12 @@ class DynamicPricingManager:
     
     def _fetch_pricing(self, base_url: str) -> None:
         """Fetch latest pricing from backend (non-blocking, with retry logic)."""
-        if self._fetch_attempted and self._pricing_cache:
-            # Already have cached data, don't retry aggressively
-            return
+        with self._lock:
+            if self._fetch_attempted and self._pricing_cache:
+                # Already have cached data, don't retry aggressively
+                self._fetch_in_progress = False
+                return
 
-        self._fetch_in_progress = True
         self._fetch_attempted = True
         
         try:

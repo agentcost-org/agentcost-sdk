@@ -13,6 +13,7 @@ The SDK uses a tiered pricing lookup:
 from typing import Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime
+import threading
 
 
 # Fallback pricing when backend is unreachable.
@@ -96,6 +97,14 @@ class AgentCostConfig:
     
     global_metadata: Dict[str, Any] = field(default_factory=dict)
     
+    def __repr__(self) -> str:
+        """Mask sensitive fields in repr to avoid key leakage in logs/tracebacks."""
+        masked_key = f"{self.api_key[:8]}..." if len(self.api_key) > 8 else "***"
+        return (
+            f"AgentCostConfig(api_key='{masked_key}', project_id='{self.project_id}', "
+            f"base_url='{self.base_url}', enabled={self.enabled})"
+        )
+    
     def get_pricing(self, model: str) -> Dict[str, float]:
         """
         Get pricing for a model.
@@ -122,14 +131,17 @@ class AgentCostConfig:
 
 # Global config instance (set by tracker.init())
 _config: AgentCostConfig | None = None
+_config_lock = threading.Lock()
 
 
 def get_config() -> AgentCostConfig | None:
-    """Get the current global configuration"""
-    return _config
+    """Get the current global configuration (thread-safe)"""
+    with _config_lock:
+        return _config
 
 
 def set_config(config: AgentCostConfig) -> None:
-    """Set the global configuration"""
+    """Set the global configuration (thread-safe)"""
     global _config
-    _config = config
+    with _config_lock:
+        _config = config

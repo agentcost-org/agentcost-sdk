@@ -268,13 +268,16 @@ class AgentCostTracker:
             yield
             return
         
+        # Thread-safe: snapshot and restore so concurrent callers
+        # don't interfere with each other.
         old_metadata = self._config.global_metadata.copy()
-        
-        self._config.global_metadata.update(kwargs)
+        merged = {**old_metadata, **kwargs}
+        self._config.global_metadata = merged
         
         try:
             yield
         finally:
+            # Restore to the snapshot, not to an empty dict
             self._config.global_metadata = old_metadata
     
     @property

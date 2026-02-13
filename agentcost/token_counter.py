@@ -15,8 +15,9 @@ logger = logging.getLogger("agentcost.token_counter")
 class TokenCounter:
     """Handles token counting for different LLM providers"""
     
-    # Track if we've warned about estimation for this model
+    # Track if we've warned about estimation for this model (capped)
     _estimation_warnings_shown: set = set()
+    _MAX_WARNINGS_CACHE = 500
     
     MODEL_ENCODINGS: Dict[str, str] = {
         # OpenAI models
@@ -60,7 +61,8 @@ class TokenCounter:
                     f"Token counting for '{model}' failed, using character-based estimation. "
                     f"Counts may be inaccurate. Error: {e}"
                 )
-                cls._estimation_warnings_shown.add(model)
+                if len(cls._estimation_warnings_shown) < cls._MAX_WARNINGS_CACHE:
+                    cls._estimation_warnings_shown.add(model)
             return cls._estimate_tokens(text)
     
     @classmethod

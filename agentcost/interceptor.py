@@ -162,6 +162,7 @@ class LangChainInterceptor:
             
             error_message = None
             response = None
+            start_time = time.time()
             
             try:
                 response = original_invoke(llm_self, input_data, *args, **kwargs)

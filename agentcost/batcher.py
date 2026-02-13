@@ -66,8 +66,10 @@ class HybridBatcher:
         # Start background flush thread
         self._start_flush_thread()
         
-        # Register cleanup on program exit
-        atexit.register(self.shutdown)
+        # atexit does not deduplicate automatically, so we track registration
+        if not getattr(HybridBatcher, '_atexit_registered', False):
+            atexit.register(self.shutdown)
+            HybridBatcher._atexit_registered = True
     
     def add(self, event: Dict) -> None:
         """
