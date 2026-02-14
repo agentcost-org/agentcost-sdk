@@ -198,8 +198,16 @@ class LangChainInterceptor:
                     'input_hash': _hash_input(input_text),
                 }
                 
-                if config and config.global_metadata:
-                    event['metadata'] = config.global_metadata.copy()
+                effective_meta = None
+                try:
+                    from .tracker import get_effective_metadata
+                    effective_meta = get_effective_metadata()
+                except ImportError:
+                    if config and config.global_metadata:
+                        effective_meta = config.global_metadata.copy()
+
+                if effective_meta:
+                    event['metadata'] = effective_meta
                 
                 try:
                     event_callback(event)
@@ -274,8 +282,16 @@ class LangChainInterceptor:
                     'input_hash': _hash_input(input_text),
                 }
                 
-                if config and config.global_metadata:
-                    event['metadata'] = config.global_metadata.copy()
+                effective_meta = None
+                try:
+                    from .tracker import get_effective_metadata
+                    effective_meta = get_effective_metadata()
+                except ImportError:
+                    if config and config.global_metadata:
+                        effective_meta = config.global_metadata.copy()
+
+                if effective_meta:
+                    event['metadata'] = effective_meta
                 
                 try:
                     event_callback(event)
@@ -348,8 +364,16 @@ class LangChainInterceptor:
                     'input_hash': _hash_input(input_text),
                 }
                 
-                if config and config.global_metadata:
-                    event['metadata'] = config.global_metadata.copy()
+                effective_meta = None
+                try:
+                    from .tracker import get_effective_metadata
+                    effective_meta = get_effective_metadata()
+                except ImportError:
+                    if config and config.global_metadata:
+                        effective_meta = config.global_metadata.copy()
+
+                if effective_meta:
+                    event['metadata'] = effective_meta
                 
                 try:
                     event_callback(event)
@@ -428,8 +452,16 @@ class LangChainInterceptor:
                     'input_hash': _hash_input(input_text),
                 }
                 
-                if config and config.global_metadata:
-                    event['metadata'] = config.global_metadata.copy()
+                effective_meta = None
+                try:
+                    from .tracker import get_effective_metadata
+                    effective_meta = get_effective_metadata()
+                except ImportError:
+                    if config and config.global_metadata:
+                        effective_meta = config.global_metadata.copy()
+
+                if effective_meta:
+                    event['metadata'] = effective_meta
                 
                 try:
                     event_callback(event)

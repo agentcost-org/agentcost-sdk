@@ -22,28 +22,18 @@ Usage:
     # ... run your code ...
     events = track_costs.get_local_events()  # See all captured events
 
-For more information, visit: https://agentcost.dev
+For more information, visit: https://agentcost.tech
 """
 
 from pathlib import Path
 
 
-def _get_version() -> str:
-    """Read version from VERSION file (single source of truth)."""
-    possible_paths = [
-        Path(__file__).parent.parent.parent / "VERSION",  # Project root
-        Path(__file__).parent.parent / "VERSION",
-        Path("VERSION"),
-    ]
-    
-    for path in possible_paths:
-        if path.exists():
-            return path.read_text().strip()
-    
-    return "0.1.0"  # Default fallback
-
-
-__version__ = _get_version()
+try:
+    from importlib.metadata import version, PackageNotFoundError
+    __version__ = version("agentcost")
+except (ImportError, PackageNotFoundError):
+    # Fallback for dev mode or old Python without importlib_metadata
+    __version__ = "0.1.0"
 __author__ = "AgentCost"
 
 # Import main tracker module as track_costs

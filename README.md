@@ -49,7 +49,7 @@ track_costs.init(
     project_id="my-project",
 
     # Optional settings
-    base_url="https://api.agentcost.dev",   # Your backend URL
+    base_url="https://api.agentcost.tech",   # Your backend URL
     batch_size=10,                          # Events before auto-flush
     flush_interval=5.0,                     # Seconds between flushes
     debug=True,                             # Enable debug logging

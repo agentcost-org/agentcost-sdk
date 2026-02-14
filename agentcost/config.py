@@ -81,7 +81,7 @@ class AgentCostConfig:
     api_key: str
     project_id: str
     
-    base_url: str = "https://api.agentcost.dev"
+    base_url: str = ""
     timeout: float = 10.0
     max_retries: int = 3
     
@@ -92,6 +92,11 @@ class AgentCostConfig:
     debug: bool = False
     
     default_agent_name: str = "default"
+    
+    def __post_init__(self):
+        if not self.base_url:
+            import os
+            self.base_url = os.getenv("AGENTCOST_API_URL", "https://api.agentcost.tech")
     
     custom_pricing: Dict[str, Dict[str, float]] = field(default_factory=dict)
     

@@ -15,7 +15,7 @@ from .http_client import AgentCostHTTPClient, MockHTTPClient
 
 
 # Default API URL
-DEFAULT_API_URL = "https://api.agentcost.dev"
+DEFAULT_API_URL = "https://api.agentcost.tech"
 
 
 def _get_api_url(base_url: Optional[str] = None) -> str:
@@ -29,6 +29,26 @@ def _get_api_url(base_url: Optional[str] = None) -> str:
 _agent_name_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     '_agent_name_var', default=None
 )
+
+# Thread/async-safe context variable for metadata override
+_metadata_var: contextvars.ContextVar[Optional[Dict[str, Any]]] = contextvars.ContextVar(
+    '_metadata_var', default=None
+)
+
+
+def get_effective_metadata() -> Dict[str, Any]:
+    """
+    Get the effective metadata dict, merging global config metadata
+    with any ContextVar overrides from the metadata() context manager.
+    Thread-safe: concurrent callers in different threads/async tasks
+    see only their own overrides.
+    """
+    config = get_config()
+    base = config.global_metadata.copy() if config and config.global_metadata else {}
+    ctx_meta = _metadata_var.get(None)
+    if ctx_meta:
+        base.update(ctx_meta)
+    return base
 
 
 class AgentCostTracker:
@@ -56,6 +76,7 @@ class AgentCostTracker:
         self._http_client: Optional[AgentCostHTTPClient] = None
         self._is_initialized = False
         self._local_mode = False
+        self._atexit_registered = False
     
     def init(
         self,
@@ -78,7 +99,7 @@ class AgentCostTracker:
         Args:
             api_key: Your AgentCost API key (not needed in local_mode)
             project_id: Your project ID (not needed in local_mode)
-            base_url: Backend API URL (default: AGENTCOST_API_URL env var or https://api.agentcost.dev)
+            base_url: Backend API URL (default: AGENTCOST_API_URL env var or https://api.agentcost.tech)
             batch_size: Number of events before auto-flush
             flush_interval: Seconds between time-based flushes
             enabled: Enable/disable tracking
@@ -164,7 +185,9 @@ class AgentCostTracker:
         else:
             print("[AgentCost] Failed to start interceptor")
         
-        atexit.register(self.shutdown)
+        if not self._atexit_registered:
+            atexit.register(self.shutdown)
+            self._atexit_registered = True
         
         return self
     
@@ -263,22 +286,21 @@ class AgentCostTracker:
         Usage:
             with tracker.metadata(conversation_id="abc123"):
                 llm.invoke("Hello")  # Event includes conversation_id
+        
+        Thread-safe: uses contextvars so concurrent blocks don't interfere.
         """
         if not self._config:
             yield
             return
         
-        # Thread-safe: snapshot and restore so concurrent callers
-        # don't interfere with each other.
-        old_metadata = self._config.global_metadata.copy()
-        merged = {**old_metadata, **kwargs}
-        self._config.global_metadata = merged
-        
+        # Merge with any existing context metadata (for nested calls)
+        existing = _metadata_var.get(None) or {}
+        merged = {**existing, **kwargs}
+        token = _metadata_var.set(merged)
         try:
             yield
         finally:
-            # Restore to the snapshot, not to an empty dict
-            self._config.global_metadata = old_metadata
+            _metadata_var.reset(token)
     
     @property
     def is_active(self) -> bool:

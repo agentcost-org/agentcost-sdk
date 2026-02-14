@@ -63,7 +63,7 @@ class AgentCostHTTPClient:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.agentcost.dev",
+        base_url: str = "",
         timeout: float = 10.0,
         max_retries: int = 3,
         debug: bool = False
@@ -71,12 +71,15 @@ class AgentCostHTTPClient:
         """
         Args:
             api_key: User's AgentCost API key
-            base_url: Backend API URL
+            base_url: Backend API URL (default: AGENTCOST_API_URL env var or https://api.agentcost.tech)
             timeout: Request timeout in seconds
             max_retries: Number of retry attempts
             debug: Enable debug logging
         """
         self.api_key = api_key
+        if not base_url:
+            import os
+            base_url = os.getenv("AGENTCOST_API_URL", "https://api.agentcost.tech")
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.debug = debug
