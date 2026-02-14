@@ -12,7 +12,7 @@ Thank you for your interest in contributing!
 
 ## Development Setup
 ```bash
-git clone https://github.com/agentcost/agentcost-sdk.git
+git clone https://github.com/agentcost-ai/agentcost-sdk.git
 cd agentcost-sdk
 pip install -r requirements.txt
 pytest  # Run tests

@@ -27,10 +27,10 @@ setup(
     description="Track LLM costs in LangChain applications with zero code changes",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/agentcost/agentcost-sdk",
+    url="https://github.com/agentcost-ai/agentcost-sdk",
     project_urls={
-        "Bug Tracker": "https://github.com/agentcost/agentcost-sdk/issues",
-        "Documentation": "https://docs.agentcost.tech",
+        "Bug Tracker": "https://github.com/agentcost-ai/agentcost-sdk/issues",
+        "Documentation": "https://agentcost.tech/docs/sdk",
     },
     license="MIT",
     classifiers=[
