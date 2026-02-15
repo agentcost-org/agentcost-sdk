@@ -13,7 +13,7 @@ def get_version() -> str:
     version_file = Path(__file__).parent.parent / "VERSION"
     if version_file.exists():
         return version_file.read_text().strip()
-    return "0.1.0"
+    return "0.1.1"
 
 
 with open("README.md", "r", encoding="utf-8") as fh:
